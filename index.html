@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>工蜂语音（WorkBuddy-VibeVoice）</title>
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="logo">工蜂语音</div>
+      <nav>
+        <a href="index.html">首页</a>
+        <a href="admin.html">管理后台</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <h1>把文字变成有温度的声音</h1>
+      <p>基于 VibeVoice 理念的在线语音合成演示工作台</p>
+    </section>
+
+    <section class="demo-card">
+      <div class="form-group">
+        <label for="输入文本">输入文本</label>
+        <textarea id="输入文本" placeholder="请输入需要合成的文字，例如：你好，世界！"></textarea>
+      </div>
+
+      <div class="row">
+        <div class="form-group">
+          <label for="说话人">说话人</label>
+          <select id="说话人">
+            <option value="默认女声">默认女声</option>
+            <option value="温柔女声">温柔女声</option>
+            <option value="沉稳男声">沉稳男声</option>
+            <option value="活力男声">活力男声</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="情绪">情绪</label>
+          <select id="情绪">
+            <option value="平静">平静</option>
+            <option value="高兴">高兴</option>
+            <option value="悲伤">悲伤</option>
+            <option value="愤怒">愤怒</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="语速">语速</label>
+          <input type="number" id="语速" min="0.5" max="2" step="0.1" value="1" />
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn-primary" id="生成按钮">生成语音</button>
+        <button class="btn-secondary" id="下载按钮">下载音频</button>
+      </div>
+
+      <audio id="音频播放器" controls class="hidden"></audio>
+    </section>
+
+    <section class="features">
+      <div class="feature">
+        <h3>多说话人</h3>
+        <p>支持多种音色选择，快速切换不同说话人风格。</p>
+      </div>
+      <div class="feature">
+        <h3>情绪控制</h3>
+        <p>通过情绪标签调整合成语音的情感表达。</p>
+      </div>
+      <div class="feature">
+        <h3>语速调节</h3>
+        <p>自由控制语速快慢，适配不同场景需求。</p>
+      </div>
+      <div class="feature">
+        <h3>实时试听</h3>
+        <p>生成后可立即播放，无需等待文件下载。</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>© 2026 工蜂语音（WorkBuddy-VibeVoice）</p>
+    </div>
+  </footer>
+
+  <div class="toast" id="提示"></div>
+  <script src="assets/js/main.js"></script>
+</body>
+</html>

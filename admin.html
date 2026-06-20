@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>管理后台 - 工蜂语音</title>
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="logo">工蜂语音</div>
+      <nav>
+        <a href="index.html">首页</a>
+        <a href="admin.html">管理后台</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="admin-layout">
+    <aside class="sidebar">
+      <h2>管理菜单</h2>
+      <div class="menu">
+        <a href="#概览" class="active" data-section="概览">概览</a>
+        <a href="#模型配置" data-section="模型配置">模型配置</a>
+        <a href="#任务队列" data-section="任务队列">任务队列</a>
+        <a href="#系统状态" data-section="系统状态">系统状态</a>
+      </div>
+    </aside>
+
+    <div class="main">
+      <section class="section" id="概览">
+        <h3>概览</h3>
+        <div class="cards">
+          <div class="card">
+            <h4>今日合成次数</h4>
+            <div class="value" id="今日次数">0</div>
+          </div>
+          <div class="card">
+            <h4>排队任务</h4>
+            <div class="value" id="排队任务">0</div>
+          </div>
+          <div class="card">
+            <h4>在线模型</h4>
+            <div class="value" id="在线模型">1</div>
+          </div>
+          <div class="card">
+            <h4>存储占用</h4>
+            <div class="value" id="存储占用">0 MB</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="模型配置">
+        <h3>模型配置</h3>
+        <div class="form-group">
+          <label for="接口地址">后端接口地址</label>
+          <input type="text" id="接口地址" placeholder="http://localhost:8000/v1/speech" />
+        </div>
+        <div class="form-group">
+          <label for="接口密钥">接口密钥</label>
+          <input type="password" id="接口密钥" placeholder="留空表示使用本地浏览器语音合成" />
+        </div>
+        <div class="form-group">
+          <label for="模型路径">模型路径</label>
+          <input type="text" id="模型路径" placeholder="microsoft/VibeVoice-1.5B" />
+        </div>
+        <div class="form-group">
+          <label for="最大并发">最大并发数</label>
+          <input type="number" id="最大并发" min="1" max="16" value="4" />
+        </div>
+        <div class="actions">
+          <button class="btn-primary" id="保存配置">保存配置</button>
+          <button class="btn-secondary" id="重置配置">重置</button>
+        </div>
+      </section>
+
+      <section class="section" id="任务队列">
+        <h3>任务队列</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>时间</th>
+              <th>文本</th>
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="任务列表"></tbody>
+        </table>
+      </section>
+
+      <section class="section" id="系统状态">
+        <h3>系统状态</h3>
+        <p>浏览器： <span id="浏览器信息"></span></p>
+        <p>语音支持： <span id="语音支持"></span></p>
+        <p>版本： <span id="版本">v1.0.0</span></p>
+      </section>
+    </div>
+  </div>
+
+  <div class="toast" id="提示"></div>
+  <script src="assets/js/admin.js"></script>
+</body>
+</html>
