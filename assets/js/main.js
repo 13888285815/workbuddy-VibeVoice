@@ -5,18 +5,13 @@ const 生成按钮 = document.getElementById('生成按钮');
 const 下载按钮 = document.getElementById('下载按钮');
 const 音频播放器 = document.getElementById('音频播放器');
 const 提示 = document.getElementById('提示');
+const 下载状态 = document.getElementById('下载状态');
 
-let 当前音频地址 = null;
-let 当前音频块 = null;
 let allVoices = [];
 let voicesReady = false;
-
-/* ========================================
- *  Edge TTS Worker 代理配置
- *  部署 Cloudflare Worker 后填入 URL
- *  未配置时使用浏览器原生语音合成
- * ======================================== */
-var WORKER_URL = '';
+let 正在播放 = false;
+let 当前说话人 = '';
+let 当前文本 = '';
 
 function 显示提示(文字) {
   提示.textContent = 文字;
@@ -30,11 +25,6 @@ function 记录任务(文本, 状态) {
   localStorage.setItem('语音任务', JSON.stringify(列表.slice(0, 50)));
 }
 
-function 速率转字符串(速度) {
-  var 百分比 = Math.round((速度 - 1) * 100);
-  return (百分比 >= 0 ? '+' : '') + 百分比 + '%';
-}
-
 /* ====== 语音列表初始化（多次重试确保加载完整） ====== */
 function 加载语音列表() {
   if (!window.speechSynthesis) return;
@@ -42,18 +32,13 @@ function 加载语音列表() {
   if (voices.length > 0) {
     allVoices = voices;
     voicesReady = true;
-    console.log('语音列表已加载（' + voices.length + ' 个语音）：');
-    voices.forEach(function (v) { console.log('  ' + v.lang + ' | ' + v.name); });
+    console.log('语音列表已加载（' + voices.length + ' 个语音）');
   }
 }
 
-/* 立即尝试加载 + 事件回调 + 重试兜底 */
 加载语音列表();
 if (window.speechSynthesis) {
-  window.speechSynthesis.onvoiceschanged = function () {
-    加载语音列表();
-  };
-  /* 有些浏览器延迟加载，最多重试 5 次 */
+  window.speechSynthesis.onvoiceschanged = function () { 加载语音列表(); };
   var retryCount = 0;
   var retryTimer = setInterval(function () {
     retryCount++;
@@ -69,102 +54,217 @@ if (window.speechSynthesis) {
   }, 500);
 }
 
+/* ====== BCP47 语言映射 ====== */
+var 音色映射 = {
+  'zh-CN-XiaoxiaoNeural': 'zh-CN',
+  'zh-CN-YunxiNeural': 'zh-CN',
+  'zh-CN-YunjianNeural': 'zh-CN',
+  'zh-CN-XiaoyiNeural': 'zh-CN',
+  'zh-CN-XiaoxuanNeural': 'zh-CN',
+  'zh-CN-YunyangNeural': 'zh-CN',
+  'zh-CN-YunxiaNeural': 'zh-CN',
+  'zh-TW-HsiaoChenNeural': 'zh-TW',
+  'zh-TW-YunJheNeural': 'zh-TW',
+  'zh-HK-WanLungNeural': 'zh-HK',
+  'zh-HK-HiuGaaiNeural': 'zh-HK',
+  'en-US-EmmaMultilingualNeural': 'en-US',
+  'en-US-AndrewMultilingualNeural': 'en-US',
+  'ja-JP-NanamiNeural': 'ja-JP',
+  'ko-KR-SunHiNeural': 'ko-KR'
+};
+
 /* ====== 查找最匹配的语音 ====== */
 function 查找语音(目标Lang) {
-  if (allVoices.length === 0) {
-    /* 强制刷新一次 */
-    if (window.speechSynthesis) {
-      allVoices = window.speechSynthesis.getVoices();
-    }
+  if (allVoices.length === 0 && window.speechSynthesis) {
+    allVoices = window.speechSynthesis.getVoices();
   }
-
-  /* 精确匹配 */
   for (var i = 0; i < allVoices.length; i++) {
     if (allVoices[i].lang === 目标Lang) return allVoices[i];
   }
-  /* 前缀匹配 */
   for (var i = 0; i < allVoices.length; i++) {
     if (allVoices[i].lang.indexOf(目标Lang.split('-')[0]) === 0) return allVoices[i];
   }
-  /* 最终兜底：返回第一个语音（至少有声音） */
-  if (allVoices.length > 0) return allVoices[0];
-  return null;
+  return allVoices.length > 0 ? allVoices[0] : null;
 }
 
-/* ====== 方案 A: Worker 代理 Edge TTS ====== */
-async function worker合成(文本, 音色, 速率) {
-  var 响应 = await fetch(WORKER_URL + '/tts', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: 文本, voice: 音色, rate: 速率, volume: '+0%', pitch: '+0Hz' })
-  });
-  if (!响应.ok) throw new Error('Worker 返回错误 ' + 响应.status);
-  return await 响应.blob();
+/* ====== 生成长文本分段处理（Chrome 15秒 bug） ====== */
+function 分段文本(文本, 最大长度) {
+  最大长度 = 最大长度 || 180;
+  if (文本.length <= 最大长度) return [文本];
+
+  var 段落 = [];
+  var i = 0;
+  while (i < 文本.length) {
+    var end = i + 最大长度;
+    if (end >= 文本.length) { 段落.push(文本.slice(i)); break; }
+
+    /* 在标点处断开 */
+    var 标点 = '，。！？；：、,.!?;:\n';
+    var 断点 = -1;
+    for (var j = end; j > i; j--) {
+      if (标点.indexOf(文本[j]) !== -1) { 断点 = j + 1; break; }
+    }
+    if (断点 === -1) 断点 = end;
+    段落.push(文本.slice(i, 断点));
+    i = 断点;
+  }
+  return 段落;
 }
 
-/* ====== 方案 B: 浏览器原生 speechSynthesis ====== */
+/* ====== 浏览器原生 speechSynthesis 合成 ====== */
 function 浏览器合成(文本, 音色, 速度) {
   return new Promise(function (resolve, reject) {
     var 合成器 = window.speechSynthesis;
     if (!合成器) { reject(new Error('当前浏览器不支持语音合成')); return; }
 
-    /* BCP47 语言映射 */
-    var 音色映射 = {
-      'zh-CN-XiaoxiaoNeural': 'zh-CN',
-      'zh-CN-YunxiNeural': 'zh-CN',
-      'zh-CN-YunjianNeural': 'zh-CN',
-      'zh-CN-XiaoyiNeural': 'zh-CN',
-      'zh-CN-XiaoxuanNeural': 'zh-CN',
-      'zh-CN-YunyangNeural': 'zh-CN',
-      'zh-CN-YunxiaNeural': 'zh-CN',
-      'zh-TW-HsiaoChenNeural': 'zh-TW',
-      'zh-TW-YunJheNeural': 'zh-TW',
-      'zh-HK-WanLungNeural': 'zh-HK',
-      'zh-HK-HiuGaaiNeural': 'zh-HK',
-      'en-US-EmmaMultilingualNeural': 'en-US',
-      'en-US-AndrewMultilingualNeural': 'en-US',
-      'ja-JP-NanamiNeural': 'ja-JP',
-      'ko-KR-SunHiNeural': 'ko-KR'
-    };
-    var lang = 音色映射[音色] || 'zh-CN';
-
-    /* 先取消之前可能卡住的语音 */
     合成器.cancel();
+    var lang = 音色映射[音色] || 'zh-CN';
+    var 段落 = 分段文本(文本);
 
-    var 语段 = new SpeechSynthesisUtterance(文本);
-    语段.lang = lang;
-    语段.rate = 速度;
+    var 当前段 = 0;
+    var resumeTimer = null;
 
-    var voice = 查找语音(lang);
-    if (voice) {
-      语段.voice = voice;
-      console.log('使用语音: ' + voice.name + ' (' + voice.lang + ')');
-    } else {
-      console.warn('未找到匹配语音，使用默认（lang=' + lang + '）');
+    function 播放下一段() {
+      if (当前段 >= 段落.length) {
+        if (resumeTimer) clearInterval(resumeTimer);
+        合成器.cancel();
+        正在播放 = false;
+        resolve();
+        return;
+      }
+
+      var 语段 = new SpeechSynthesisUtterance(段落[当前段]);
+      语段.lang = lang;
+      语段.rate = 速度;
+
+      var voice = 查找语音(lang);
+      if (voice) 语段.voice = voice;
+
+      /* Chrome 长文本自动暂停 bug 的修复 */
+      resumeTimer = setInterval(function () {
+        if (!合成器.speaking) { clearInterval(resumeTimer); return; }
+        合成器.resume();
+      }, 10000);
+
+      语段.onend = function () {
+        当前段++;
+        播放下一段();
+      };
+      语段.onerror = function (e) {
+        if (e.error === 'interrupted' || e.error === 'canceled') {
+          clearInterval(resumeTimer);
+          正在播放 = false;
+          resolve();
+          return;
+        }
+        clearInterval(resumeTimer);
+        正在播放 = false;
+        reject(new Error('语音合成失败: ' + e.error));
+      };
+
+      合成器.speak(语段);
     }
 
-    /* Chrome 长文本 bug：超过约 15 秒会自动停止，需要定时 resume */
-    var resumeTimer = setInterval(function () {
-      if (!合成器.speaking) { clearInterval(resumeTimer); return; }
-      合成器.resume();
-    }, 10000);
-
-    语段.onend = function () {
-      clearInterval(resumeTimer);
-      resolve(null);
-    };
-    语段.onerror = function (e) {
-      clearInterval(resumeTimer);
-      reject(new Error('语音合成失败: ' + e.error));
-    };
-
-    /* 延迟 100ms 再 speak，确保语音列表已加载 */
-    setTimeout(function () {
-      var voice2 = 查找语音(lang);
-      if (voice2) 语段.voice = voice2;
-      合成器.speak(语段);
-    }, 100);
+    正在播放 = true;
+    播放下一段();
   });
+}
+
+/* ====== 下载：录制系统音频 ====== */
+async function 录制并下载() {
+  if (!正在播放) {
+    显示提示('请先生成并播放语音，然后在播放过程中点击下载');
+    return;
+  }
+
+  下载按钮.disabled = true;
+  下载按钮.textContent = '请选择屏幕...';
+
+  try {
+    /* 请求屏幕共享（需要选择"分享系统音频"选项） */
+    var stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: true,
+      preferCurrentTab: true
+    });
+
+    /* 获取音频轨道 */
+    var 音频轨道 = stream.getAudioTracks()[0];
+    if (!音频轨道) {
+      stream.getTracks().forEach(function(t) { t.stop(); });
+      显示提示('未获取到音频轨道，请确保勾选了"分享系统音频"');
+      下载按钮.disabled = false;
+      下载按钮.textContent = '下载音频';
+      return;
+    }
+
+    下载按钮.textContent = '录制中...';
+
+    /* 使用 MediaRecorder 录制 */
+    var recorder = new MediaRecorder(stream, {
+      mimeType: 'audio/webm;codecs=opus',
+      audioBitsPerSecond: 128000
+    });
+
+    var 音频块 = [];
+    recorder.ondataavailable = function(e) { if (e.data.size > 0) 音频块.push(e.data); };
+
+    recorder.onstop = function() {
+      stream.getTracks().forEach(function(t) { t.stop(); });
+      if (音频块.length === 0) {
+        显示提示('录制失败：未捕获到音频');
+        下载按钮.disabled = false;
+        下载按钮.textContent = '下载音频';
+        return;
+      }
+      var blob = new Blob(音频块, { type: 'audio/webm' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = '意念语音_' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.webm';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      显示提示('音频已下载（WebM 格式）');
+      下载按钮.disabled = false;
+      下载按钮.textContent = '下载音频';
+      记录任务(当前文本, '已下载');
+    };
+
+    recorder.start();
+
+    /* 监听语音播放结束，自动停止录制 */
+    var 检查间隔 = setInterval(function() {
+      if (!window.speechSynthesis.speaking) {
+        setTimeout(function() {
+          if (recorder.state === 'recording') recorder.stop();
+          clearInterval(检查间隔);
+        }, 1000);
+      }
+    }, 500);
+
+    /* 安全兜底：最多录 120 秒 */
+    setTimeout(function() {
+      if (recorder.state === 'recording') recorder.stop();
+      clearInterval(检查间隔);
+    }, 120000);
+
+    显示提示('录制已开始，语音播放完毕后自动停止');
+
+  } catch (错误) {
+    console.error('录制错误:', 错误);
+    显示提示('录制取消：' + (错误.message || '用户取消'));
+    下载按钮.disabled = false;
+    下载按钮.textContent = '下载音频';
+  }
+}
+
+/* ====== 停止播放 ====== */
+function 停止播放() {
+  if (window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+  }
+  正在播放 = false;
 }
 
 /* ====== 主入口 ====== */
@@ -174,28 +274,16 @@ async function 生成语音() {
 
   生成按钮.disabled = true;
   生成按钮.textContent = '合成中...';
-  当前音频块 = null;
-  当前音频地址 = null;
 
   try {
     var 音色 = 说话人.value;
     var 速度 = parseFloat(语速.value);
-    var 速率 = 速率转字符串(速度);
+    当前说话人 = 音色;
+    当前文本 = 文本;
 
-    if (WORKER_URL) {
-      显示提示('正在通过 Edge TTS 合成语音...');
-      当前音频块 = await worker合成(文本, 音色, 速率);
-      当前音频地址 = URL.createObjectURL(当前音频块);
-      音频播放器.src = 当前音频地址;
-      音频播放器.style.display = 'block';
-      音频播放器.play();
-      显示提示('语音生成完成（Edge TTS 高品质 MP3）');
-    } else {
-      显示提示('正在合成语音...');
-      await 浏览器合成(文本, 音色, 速度);
-      显示提示('语音播放完成');
-      音频播放器.style.display = 'none';
-    }
+    显示提示('正在合成语音...');
+    await 浏览器合成(文本, 音色, 速度);
+    显示提示('语音播放完成');
     记录任务(文本, '完成');
   } catch (错误) {
     显示提示('语音生成失败：' + 错误.message);
@@ -207,20 +295,8 @@ async function 生成语音() {
   }
 }
 
-function 下载音频() {
-  if (!当前音频块) {
-    显示提示('请先生成语音。如需下载功能，请配置 Cloudflare Worker URL');
-    return;
-  }
-  var a = document.createElement('a');
-  a.href = 当前音频地址;
-  var ext = 当前音频块.type.indexOf('mpeg') !== -1 ? 'mp3' : 'webm';
-  a.download = '意念语音_' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.' + ext;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  显示提示('音频文件已开始下载');
-}
-
 生成按钮.addEventListener('click', 生成语音);
-下载按钮.addEventListener('click', 下载音频);
+下载按钮.addEventListener('click', 录制并下载);
+
+/* 页面关闭时停止语音 */
+window.addEventListener('beforeunload', 停止播放);

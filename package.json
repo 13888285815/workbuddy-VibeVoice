@@ -1,0 +1,23 @@
+{
+  "name": "workbuddy-vibevoice",
+  "version": "1.0.0",
+  "description": "一个基于网页的语音合成演示工作台，定位为 WorkBuddy 生态的语音能力入口。当前版本使用浏览器内置语音引擎实现实时试听，后续可接入后端模型服务。",
+  "main": "cloudflare-worker.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/13888285815/workbuddy-VibeVoice.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/13888285815/workbuddy-VibeVoice/issues"
+  },
+  "homepage": "https://github.com/13888285815/workbuddy-VibeVoice#readme",
+  "dependencies": {
+    "ws": "^8.21.0"
+  }
+}
