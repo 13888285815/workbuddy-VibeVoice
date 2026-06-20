@@ -33,19 +33,12 @@
         <div class="form-group">
           <label for="说话人">说话人</label>
           <select id="说话人">
-            <option value="默认女声">默认女声</option>
-            <option value="温柔女声">温柔女声</option>
-            <option value="沉稳男声">沉稳男声</option>
-            <option value="活力男声">活力男声</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="情绪">情绪</label>
-          <select id="情绪">
-            <option value="平静">平静</option>
-            <option value="高兴">高兴</option>
-            <option value="悲伤">悲伤</option>
-            <option value="愤怒">愤怒</option>
+            <option value="zh-CN">中文女声（普通话）</option>
+            <option value="zh-TW">中文女声（台湾腔）</option>
+            <option value="zh-HK">中文女声（粤语）</option>
+            <option value="en-US">英语（美式）</option>
+            <option value="ja-JP">日语</option>
+            <option value="ko-KR">韩语</option>
           </select>
         </div>
         <div class="form-group">
@@ -59,25 +52,25 @@
         <button class="btn-secondary" id="下载按钮">下载音频</button>
       </div>
 
-      <audio id="音频播放器" controls class="hidden"></audio>
+      <audio id="音频播放器" controls style="width:100%;margin-top:24px;border-radius:8px;display:none"></audio>
     </section>
 
     <section class="features">
       <div class="feature">
         <h3>多说话人</h3>
-        <p>支持多种音色选择，快速切换不同说话人风格。</p>
-      </div>
-      <div class="feature">
-        <h3>情绪控制</h3>
-        <p>通过情绪标签调整合成语音的情感表达。</p>
+        <p>支持中文普通话、台湾腔、粤语，以及英语、日语、韩语。</p>
       </div>
       <div class="feature">
         <h3>语速调节</h3>
         <p>自由控制语速快慢，适配不同场景需求。</p>
       </div>
       <div class="feature">
-        <h3>实时试听</h3>
-        <p>生成后可立即播放，无需等待文件下载。</p>
+        <h3>一键下载</h3>
+        <p>生成后直接播放，点击下载即可保存 MP3 文件。</p>
+      </div>
+      <div class="feature">
+        <h3>纯前端</h3>
+        <p>无需后端服务，浏览器直接调用，打开即用。</p>
       </div>
     </section>
   </main>
