@@ -7,6 +7,7 @@ const 音频播放器 = document.getElementById('音频播放器');
 const 提示 = document.getElementById('提示');
 
 let 当前音频地址 = null;
+let 当前音频块 = null;
 
 /* 显示临时提示信息 */
 function 显示提示(文字) {
@@ -26,7 +27,13 @@ function 记录任务(文本, 状态) {
   localStorage.setItem('语音任务', JSON.stringify(列表.slice(0, 50)));
 }
 
-/* 生成语音：调用 Google Translate TTS 接口，返回可直接播放的 MP3 */
+/* 将语速 0.5~2 映射到 Edge TTS 的百分比格式 */
+function 速率转字符串(速度) {
+  const 百分比 = Math.round((速度 - 1) * 100);
+  return (百分比 >= 0 ? '+' : '') + 百分比 + '%';
+}
+
+/* 生成语音：调用微软 Edge 在线 TTS 服务，返回 MP3 */
 async function 生成语音() {
   const 文本 = 输入文本.value.trim();
   if (!文本) {
@@ -36,34 +43,23 @@ async function 生成语音() {
 
   生成按钮.disabled = true;
   生成按钮.textContent = '合成中...';
-  显示提示('正在生成语音...');
+  显示提示('正在连接微软 Edge TTS 服务...');
 
   try {
-    const 语言 = 说话人.value;
+    const 音色 = 说话人.value;
     const 速度 = parseFloat(语速.value);
-    /* 将语速 0.5~2 映射到 Google TTS 的 0.1~10 范围 */
-    const 谷歌语速 = Math.max(0.1, Math.min(10, 速度 * 5));
+    const 速率 = 速率转字符串(速度);
 
-    /* Google Translate TTS 接口，直接返回 MP3 音频流 */
-    const 接口地址 = 'https://translate.google.com/translate_tts';
-    const 参数 = new URLSearchParams({
-      ie: 'UTF-8',
-      q: 文本,
-      tl: 语言,
-      client: 'tw-ob',
-      ttsspeed: 谷歌语速.toFixed(1)
+    /* 使用 edge-tts-universal 浏览器端库 */
+    const 合成器 = new EdgeTTS(文本, 音色, {
+      rate: 速率,
+      volume: '+0%',
+      pitch: '+0Hz'
     });
 
-    /* 通过 CORS 代理获取音频数据，避免跨域限制 */
-    const 代理地址 = 'https://corsproxy.io/?' + encodeURIComponent(接口地址 + '?' + 参数);
-    const 响应 = await fetch(代理地址);
-
-    if (!响应.ok) {
-      throw new Error('接口返回状态码 ' + 响应.status);
-    }
-
-    const 数据块 = await 响应.blob();
-    当前音频地址 = URL.createObjectURL(数据块);
+    const 结果 = await 合成器.synthesize();
+    当前音频块 = 结果.audio;
+    当前音频地址 = URL.createObjectURL(当前音频块);
 
     /* 显示播放器并播放 */
     音频播放器.src = 当前音频地址;
@@ -75,6 +71,7 @@ async function 生成语音() {
   } catch (错误) {
     显示提示('语音生成失败：' + 错误.message);
     记录任务(文本, '失败');
+    console.error('Edge TTS 错误:', 错误);
   } finally {
     生成按钮.disabled = false;
     生成按钮.textContent = '生成语音';
@@ -83,7 +80,7 @@ async function 生成语音() {
 
 /* 下载已生成的音频文件 */
 function 下载音频() {
-  if (!当前音频地址) {
+  if (!当前音频块) {
     显示提示('请先生成语音');
     return;
   }
